@@ -6,15 +6,15 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Optional
 
-from neofs_testlib.hosting.config import ParsedAttributes
-from neofs_testlib.hosting.interfaces import DiskInfo, Host
-from neofs_testlib.shell import Shell, SSHShell
-from neofs_testlib.shell.command_inspectors import SudoInspector
-from neofs_testlib.shell.interfaces import CommandOptions, CommandResult
+from frostfs_testlib.hosting.config import ParsedAttributes
+from frostfs_testlib.hosting.interfaces import Host, DiskInfo
+from frostfs_testlib.shell import Shell, SSHShell
+from frostfs_testlib.shell.command_inspectors import SudoInspector
+from frostfs_testlib.shell.interfaces import CommandOptions, CommandResult
 
-from neofs_testlib_plugin_sbercloud.sbercloud_client import SbercloudClient
+from frostfs_testlib_plugin_sbercloud.sbercloud_client import SbercloudClient
 
-logger = logging.getLogger("neofs.testlib.hosting")
+logger = logging.getLogger("frostfs.testlib.hosting")
 
 
 @dataclass
@@ -104,7 +104,7 @@ class SbercloudHost(Host):
             "active (running)",
             service_attributes.start_timeout,
         )
-
+    
     def restart_service(self, service_name: str) -> None:
         service_attributes = self._get_service_attributes(service_name)
 
@@ -139,11 +139,10 @@ class SbercloudHost(Host):
         data_clean_cmd = (
             f"; sudo rm -rf {service_attributes.data_directory_path}/data*/*"
             if not cache_only
-            else ""
-        )
+            else "")
         cmd = f"{meta_clean_cmd}{data_clean_cmd}"
         shell.exec(cmd)
-
+    
     def _get_volume_pci_address(self, device: str) -> str:
         shell = self.get_shell()
         # Drive letters in Sbercloud have weird behavior
@@ -209,7 +208,7 @@ class SbercloudHost(Host):
         file_path = os.path.join(directory_path, f"{self._config.address}-log.txt")
         with open(file_path, "w") as file:
             file.write(logs)
-
+    
     def is_message_in_logs(
         self,
         message_regex: str,

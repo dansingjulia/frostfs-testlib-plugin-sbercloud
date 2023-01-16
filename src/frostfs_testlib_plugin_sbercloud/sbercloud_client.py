@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from neofs_testlib_plugin_sbercloud.sbercloud_auth_requests import SbercloudAuthRequests
+from frostfs_testlib_plugin_sbercloud.sbercloud_auth_requests import SbercloudAuthRequests
 
 
 class SbercloudClient:
