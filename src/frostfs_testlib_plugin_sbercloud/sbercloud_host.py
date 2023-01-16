@@ -6,15 +6,15 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Optional
 
-from neofs_testlib.hosting.config import ParsedAttributes
-from neofs_testlib.hosting.interfaces import DiskInfo, Host
-from neofs_testlib.shell import Shell, SSHShell
-from neofs_testlib.shell.command_inspectors import SudoInspector
-from neofs_testlib.shell.interfaces import CommandOptions, CommandResult
+from frostfs_testlib.hosting.config import ParsedAttributes
+from frostfs_testlib.hosting.interfaces import Host
+from frostfs_testlib.shell import Shell, SSHShell
+from frostfs_testlib.shell.command_inspectors import SudoInspector
+from frostfs_testlib.shell.interfaces import CommandOptions
 
-from neofs_testlib_plugin_sbercloud.sbercloud_client import SbercloudClient
+from frostfs_testlib_plugin_sbercloud.sbercloud_client import SbercloudClient
 
-logger = logging.getLogger("neofs.testlib.hosting")
+logger = logging.getLogger("frostfs.testlib.hosting")
 
 
 @dataclass
@@ -58,9 +58,9 @@ class ServiceAttributes(ParsedAttributes):
     """
 
     systemd_service_name: str
-    data_directory_path: Optional[str] = None
-    start_timeout: int = 90
-    stop_timeout: int = 90
+    data_directory_path: Optional[str]
+    start_timeout: int = 60
+    stop_timeout: int = 60
 
 
 class SbercloudHost(Host):
@@ -105,19 +105,6 @@ class SbercloudHost(Host):
             service_attributes.start_timeout,
         )
 
-    def restart_service(self, service_name: str) -> None:
-        service_attributes = self._get_service_attributes(service_name)
-
-        shell = self.get_shell()
-        output = shell.exec(f"sudo systemctl restart {service_attributes.systemd_service_name}")
-        logger.info(f"Start command output: {output.stdout}")
-
-        self._wait_for_service_to_be_in_state(
-            service_attributes.systemd_service_name,
-            "active (running)",
-            service_attributes.start_timeout,
-        )
-
     def stop_service(self, service_name: str) -> None:
         service_attributes = self._get_service_attributes(service_name)
 
@@ -128,121 +115,44 @@ class SbercloudHost(Host):
         self._wait_for_service_to_be_in_state(
             service_attributes.systemd_service_name,
             "inactive",
-            service_attributes.stop_timeout,
+            service_attributes.start_timeout,
         )
 
     def delete_storage_node_data(self, service_name: str, cache_only: bool = False) -> None:
         service_attributes = self._get_service_attributes(service_name)
 
         shell = self.get_shell()
-        meta_clean_cmd = f"sudo rm -rf {service_attributes.data_directory_path}/meta*/*"
-        data_clean_cmd = (
-            f"; sudo rm -rf {service_attributes.data_directory_path}/data*/*"
-            if not cache_only
-            else ""
+        cmd = (
+            f"sudo rm -rf {service_attributes.data_directory_path}/meta*"
+            if cache_only
+            else f"sudo rm -rf {service_attributes.data_directory_path}/*"
         )
-        cmd = f"{meta_clean_cmd}{data_clean_cmd}"
         shell.exec(cmd)
-
-    def _get_volume_pci_address(self, device: str) -> str:
-        shell = self.get_shell()
-        # Drive letters in Sbercloud have weird behavior
-        # let's say we have drives [vda, vdb, vdc]
-        # If we detach vd*b* and attach it again, the new drive letter
-        # MAY change and new set of drives will be [vda, vdc, vde]
-        # or MAY NOT change and new set of drives will be [vda, vdb, vdc] as before
-        # However, sbercloud API will still have it as vd*b*
-        # Due to letter of a drive may change we need to find volume by pci address.
-        cmd = f"sudo udevadm info -n {device} | egrep \"S:.*path/pci\" | awk '{{print $2}}'"
-        pci_address = os.path.basename(shell.exec(cmd).stdout.strip())
-        return pci_address
-
-    def _get_volume_label(self, device: str) -> str:
-        shell = self.get_shell()
-        # PCI address of a drive may also change, so
-        # we need to find volume label to check if volume is detached/attached.
-        cmd = f"sudo udevadm info -n {device} | egrep \"S:.*label\" | awk '{{print $2}}'"
-        pci_address = os.path.basename(shell.exec(cmd).stdout.strip())
-        return pci_address
-
-    def detach_disk(self, device: str) -> DiskInfo:
-        sbercloud_client = self._get_sbercloud_client()
-        node_id = sbercloud_client.find_ecs_node_by_ip(self._config.address)
-
-        pci_address = self._get_volume_pci_address(device)
-        volume_label = self._get_volume_label(device)
-        volume_id = sbercloud_client.find_volume_id_by_pci_address(
-            node_id, pci_address.replace("pci-", "")
-        )
-
-        sbercloud_client.detach_volume(node_id, volume_id)
-
-        return DiskInfo({"volume_id": volume_id, "volume_label": volume_label})
-
-    def is_disk_attached(self, device: str, disk_info: DiskInfo) -> bool:
-        label = disk_info["volume_label"]
-        shell = self.get_shell()
-        cmd = f"ls /dev/disk/by-label | grep ^{label}"
-        return shell.exec(cmd, options=CommandOptions(check=False)).stdout.strip() != ""
-
-    def attach_disk(self, device: str, disk_info: DiskInfo) -> None:
-        sbercloud_client = self._get_sbercloud_client()
-        node_id = sbercloud_client.find_ecs_node_by_ip(self._config.address)
-
-        if "volume_id" not in disk_info:
-            raise RuntimeError(f"Volume_id must present in service_info for sbercloud: {disk_info}")
-
-        volume_id = disk_info["volume_id"]
-
-        sbercloud_client.attach_volume(node_id, device, volume_id)
 
     def dump_logs(
         self,
         directory_path: str,
         since: Optional[datetime] = None,
         until: Optional[datetime] = None,
-        filter_regex: Optional[int] = None,
     ) -> None:
-        logs = self._get_logs(since, until, filter_regex).stdout
+        # We do not filter out logs of frostfs services, because system logs might contain
+        # information that is useful for troubleshooting
+        filters = " ".join(
+            [
+                f"--since '{since:%Y-%m-%d %H:%M:%S}'" if since else "",
+                f"--until '{until:%Y-%m-%d %H:%M:%S}'" if until else "",
+            ]
+        )
+
+        shell = self.get_shell()
+        options = CommandOptions(no_log = True)
+        result = shell.exec(f"journalctl --no-pager {filters}", options)
+        logs = result.stdout
 
         # Dump logs to the directory
         file_path = os.path.join(directory_path, f"{self._config.address}-log.txt")
         with open(file_path, "w") as file:
             file.write(logs)
-
-    def is_message_in_logs(
-        self,
-        message_regex: str,
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None,
-    ) -> bool:
-        result = self._get_logs(since, until, message_regex)
-        if result.return_code == 0 and result.stdout:
-            return True
-
-        return False
-
-    def _get_logs(
-        self,
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None,
-        filter_regex: Optional[int] = None,
-    ) -> CommandResult:
-        arguments_list = [
-            f"--since '{since:%Y-%m-%d %H:%M:%S}'" if since else "",
-            f"--until '{until:%Y-%m-%d %H:%M:%S}'" if until else "",
-        ]
-
-        if filter_regex:
-            arguments_list.append(f"--grep '{filter_regex}'")
-            arguments_list.append("--case-sensitive=0")
-
-        arguments = " ".join(arguments_list)
-
-        shell = self.get_shell()
-        options = CommandOptions(no_log=True, check=False)
-        result = shell.exec(f"journalctl --no-pager {arguments}", options)
-        return result
 
     def _get_service_attributes(self, service_name) -> ServiceAttributes:
         service_config = self.get_service_config(service_name)

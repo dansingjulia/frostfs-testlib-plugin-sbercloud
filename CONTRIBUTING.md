@@ -3,8 +3,8 @@
 First, thank you for contributing! We love and encourage pull requests from
 everyone. Please follow the guidelines:
 
-- Check the open [issues](https://github.com/nspcc-dev/neofs-testlib-plugin-sbercloud/issues) and
-  [pull requests](https://github.com/nspcc-dev/neofs-testlib-plugin-sbercloud/pulls) for existing
+- Check the open [issues](https://github.com/TrueCloudLab/frostfs-testlib-plugin-sbercloud/issues) and
+  [pull requests](https://github.com/TrueCloudLab/frostfs-testlib-plugin-sbercloud/pulls) for existing
   discussions.
 
 - Open an issue first, to discuss a new feature or enhancement.
@@ -22,12 +22,12 @@ everyone. Please follow the guidelines:
 
 ## Development Workflow
 
-Start by forking the `neofs-testlib-plugin-sbercloud` repository, make changes in a branch and then
+Start by forking the `frostfs-testlib-plugin-sbercloud` repository, make changes in a branch and then
 send a pull request. We encourage pull requests to discuss code changes. Here
 are the steps in details:
 
 ### Set up your GitHub Repository
-Fork [Sbercloud plugin upstream](https://github.com/nspcc-dev/neofs-testlib-plugin-sbercloud/fork) source
+Fork [Sbercloud plugin upstream](https://github.com/TrueCloudLab/frostfs-testlib-plugin-sbercloud/fork) source
 repository to your own personal repository. Copy the URL of your fork and clone it:
 
 ```shell
@@ -36,8 +36,8 @@ $ git clone <url of your fork>
 
 ### Set up git remote as ``upstream``
 ```shell
-$ cd neofs-testlib-plugin-sbercloud
-$ git remote add upstream https://github.com/nspcc-dev/neofs-testlib-plugin-sbercloud
+$ cd frostfs-testlib-plugin-sbercloud
+$ git remote add upstream https://github.com/TrueCloudLab/frostfs-testlib-plugin-sbercloud/
 $ git fetch upstream
 ```
 
@@ -177,7 +177,7 @@ To check that package description will be correctly rendered at PyPI, please, us
 $ twine check dist/*
 ```
 
-To upload package to [test PyPI](https://test.pypi.org/project/neofs-testlib-plugin-sbercloud/), please, use command:
+To upload package to [test PyPI](https://test.pypi.org/project/frostfs-testlib-plugin-sbercloud/), please, use command:
 ```shell
 $ twine upload -r testpypi dist/*
 ```
